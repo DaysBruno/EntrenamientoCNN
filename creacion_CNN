@@ -1,0 +1,271 @@
+# Librerías
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import tensorflow as tf
+from sklearn.model_selection import train_test_split
+
+# Conectar con drive
+from google.colab import drive
+drive.mount('/content/drive')
+
+# Leer el csv con las imágenes ya transformadas
+data = pd.read_csv("/content/drive/MyDrive/Colab Notebooks/imagenes.csv")
+data.head()
+
+# Contamos las ocurrencias de cada emoción en la columna "emotion":
+data["emotion"].value_counts()
+
+# Contamos las ocurrencias de cada etiqueta en la columna "Usage":
+data["Usage"].value_counts()
+
+# Definimos las clases de emociones
+clases = ["Enojo", "Asco", "Miedo", "Felicidad", "Tristeza", "Sorpresa", "Neutral"]
+
+def plot_data(data, clases):
+
+  values = data["emotion"].value_counts().sort_index(ascending=True)
+  colors = ["lightgreen", "blue", "lightblue", "pink", "orange", "yellow", "purple"]
+
+  plt.figure(figsize=[9, 3])
+
+  plt.bar(x=clases, height=values, color=colors, edgecolor='black')
+
+  plt.xlabel("Emociones")
+  plt.ylabel("Cantidad")
+  plt.title("Cantidad de imágenes por emoción")
+  plt.show()
+
+plot_data(data, clases)
+
+# Veamos si hay datos faltantes
+data.isna().sum()
+
+data.info()
+
+# Se sugiere retirar 3 clases, asco, miedo y sorpresa debido a la confusión que puede haber al usar el modelo
+# Esto es opcional
+data = data[data["emotion"] != 1]
+data = data[data["emotion"] != 2]
+data = data[data["emotion"] != 6]
+data["emotion"].value_counts().reset_index(drop=True, inplace=True)
+
+# Visualizar las primeras 10 filas de los datos
+data[:10]
+
+# Dividamos los datos
+# En X guardamos las columnas del DataFrame data excepto la columna "emotion"
+X = data.drop("emotion", axis=1)
+
+# En y se guarda sólo la columna "emotion" del DataFrame
+y = data["emotion"]
+
+# Concatenamos X, y por columnas
+df = pd.concat([X, y], axis=1)
+
+# Contamos el número de muestras por emoción
+df["emotion"].value_counts()
+
+# Con las siguientes funciones tomamos un renglón y lo convertimos en imagen
+
+# Separamos la cadena de caracteres por espacios y se convierte en numpy
+def pixels_to_array(pixels):
+    array = np.array(pixels.split(),'float64')
+    return array
+
+# Cambiamos las dimensiones para que pase de un renglón a un arreglo 48x48
+def image_reshape(data):
+    image = np.reshape(data.to_list(),(data.shape[0],48,48,1))
+    image = np.repeat(image, 3, -1)
+    return image
+
+df['pixels'] = df["pixels"].apply(pixels_to_array)
+# Dividamos los datos en entrenamiento y prueba
+# Ignoro el motivo, pero parte de los datos son "públicos" y otros son "privados"
+data_train = df[df["Usage"] == "Training"]
+data_test1 = df[df["Usage"] == "PublicTest"]
+data_test2 = df[df["Usage"] == "PrivateTest"]
+data_test = pd.concat([data_test1, data_test2])
+
+# Aplicamos el re-dimensionamiento
+X_train = image_reshape(data_train["pixels"])
+X_test = image_reshape(data_test["pixels"])
+
+# Guardamos las etiquetas para cada imagen
+y_train = data_train["emotion"]
+y_test = data_test["emotion"]
+
+import random
+
+# Define la etiqueta que deseas mostrar (por ejemplo, Enojo = 0, Felicidad = 3, Tristeza = 4 o Neutral = 6)
+emocion_deseada = 5  # Cambia esto al número de la emoción deseada
+
+# Filtra el conjunto de datos para obtener solo las muestras con la etiqueta deseada
+muestras_con_etiqueta_deseada = X_train[y_train == emocion_deseada]
+
+# Selecciona aleatoriamente 20 índices de muestras
+indices_aleatorios = random.sample(range(len(muestras_con_etiqueta_deseada)), 20)
+
+# Crea una figura con 4 filas y 5 columnas para mostrar las imágenes
+plt.figure(figsize=(7, 7))
+
+for i, idx in enumerate(indices_aleatorios):
+    imagen = muestras_con_etiqueta_deseada[idx]
+
+    # Normaliza la imagen al rango [0, 1]
+    imagen = imagen / 255.0
+
+    plt.subplot(4, 5, i + 1)
+    plt.imshow(imagen, cmap='gray')  # Puedes cambiar el mapa de colores según tus preferencias
+    plt.axis('off')
+
+plt.show()
+
+# Veamos las clases (numéricas) guardadas en las etiquetas
+set(y_train)
+
+# Hacer copias de y_train y y_test
+y_train_copy = y_train.copy()
+y_test_copy = y_test.copy()
+
+# Modificar las copias
+y_train_copy[y_train_copy == 0] = 0
+y_train_copy[y_train_copy == 3] = 1
+y_train_copy[y_train_copy == 4] = 2
+y_train_copy[y_train_copy == 5] = 3
+
+y_test_copy[y_test_copy == 0] = 0
+y_test_copy[y_test_copy == 3] = 1
+y_test_copy[y_test_copy == 4] = 2
+y_test_copy[y_test_copy == 5] = 3
+
+# Asignar las copias de vuelta a y_train y y_test
+y_train = y_train_copy
+y_test = y_test_copy
+
+# Veamos cómo quedaron
+set(y_train)
+
+# Vamos a crear carpetas temporales en colab
+!mkdir data
+!mkdir data/train
+!mkdir data/test
+
+import cv2
+import os
+
+def put_in_dir(X_train, X_test, y_train, y_test, classes):
+  """
+Colocamos imágenes en el directorio.
+
+  Argumentos:
+
+    datos (np.array): Imágenes
+    dir (str): Directorio para poner imágenes
+
+  Devuelve:
+    Imágenes en el directorio especificado;
+
+  """
+  for label in range(len(classes)):
+    os.makedirs("/content/data/train/" + classes[label], exist_ok=True)
+    os.makedirs("/content/data/test/" + classes[label], exist_ok=True)
+
+  for i in range(len(X_train)):
+    emotion = classes[y_train[i]]
+    cv2.imwrite(f"/content/data/train/{emotion}/{emotion}{i}.png", X_train[i])
+
+  for j in range(len(X_test)):
+    emotion = classes[y_test[j]]
+    cv2.imwrite(f"/content/data/test/{emotion}/{emotion}{j}.png", X_test[j])
+
+# Modificamos los nombres de las clases
+clases = ["Enojo", "Felicidad", "Tristeza", "Sorpresa"]
+
+put_in_dir(X_train, X_test, y_train, y_test, clases)
+
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+IMAGE_SHAPE = (48, 48)
+BATCH_SIZE = 32
+
+train_dir = "/content/data/train/"
+test_dir =  "/content/data/test/"
+
+train_datagen = ImageDataGenerator(rescale=1/255.,
+                                   rotation_range=0.5,
+                                   zoom_range=0.5)
+test_datagen = ImageDataGenerator(rescale=1/255.)
+
+train_data = train_datagen.flow_from_directory(train_dir,
+                                                target_size=IMAGE_SHAPE,
+                                                batch_size=BATCH_SIZE,
+                                                class_mode="categorical",
+                                                # shuffle=True,
+                                                save_to_dir=train_dir,
+                                               save_prefix="N",
+                                               save_format="jpg")
+
+test_data = test_datagen.flow_from_directory(test_dir,
+                                             target_size=IMAGE_SHAPE,
+                                             batch_size=BATCH_SIZE,
+                                             class_mode="categorical")
+
+# Importación de librerías para crear la CNN
+import tensorflow as tf
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Input
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras import Sequential
+from tensorflow.keras.layers import MaxPool2D
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.callbacks import ReduceLROnPlateau
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.utils import plot_model
+
+tf.random.set_seed(42)
+# Creamos el modelo
+model_1 = Sequential([
+  tf.keras.layers.Input(shape=(48, 48, 3)),
+  tf.keras.layers.Conv2D(512, (3,3), activation="relu", padding="same"),
+  BatchNormalization(),
+  tf.keras.layers.Conv2D(256, (3,3), activation="relu", padding="same"),
+  BatchNormalization(),
+  tf.keras.layers.MaxPool2D(2),
+  tf.keras.layers.Dropout(0.5),
+  tf.keras.layers.Conv2D(128, (3,3), activation="relu", padding="same"),
+  BatchNormalization(),
+  tf.keras.layers.Conv2D(64, (3,3), activation="relu", padding="same"),
+  BatchNormalization(),
+  tf.keras.layers.MaxPool2D(2),
+  tf.keras.layers.Dropout(0.5),
+  tf.keras.layers.Conv2D(32, (3,3), activation="relu", padding="same"),
+  tf.keras.layers.MaxPool2D(2),
+  tf.keras.layers.Dropout(0.5),
+  tf.keras.layers.Flatten(),
+  tf.keras.layers.Dense(4, activation="softmax")
+])
+
+#Nota: la última capa dense(4, ----) 4 es el número de nueronas, en este caso son 4 para procesar la clasificación en 4 clases, varía según aumentan las clases. 
+
+# Se compila el model
+model_1.compile(loss="categorical_crossentropy",
+                optimizer=tf.keras.optimizers.Adam(),
+                metrics=["accuracy"])
+
+# Visualizar el modelo
+plot_model(model_1, to_file='model_1.png', show_shapes=True, show_layer_names=True)
+
+checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(filepath="checkpoint/",
+                                                         save_weights_only=False,
+                                                         save_best_only=True,
+                                                         save_freq="epoch",
+                                                         verbose=1)
+
+reduce_lr = ReduceLROnPlateau(monitor='val_accuracy', factor=0.2,
+                              patience=8, min_lr=0.00001)
+
+# Entrenamiento del modelo
+history = model_1.fit(train_data, epochs=45, callbacks=[reduce_lr, checkpoint_callback], validation_data=test_data)
+model_1.save("/content/drive/MyDrive/Colab Notebooks/model_final_0.64.h5")
