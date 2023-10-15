@@ -1,0 +1,39 @@
+from PIL import Image
+import os
+import csv
+import cv2
+
+# Ruta de la carpeta que contiene las subcarpetas de emociones
+carpeta = '/content/drive/MyDrive/Colab Notebooks/Tarea4/Rostrosp'
+
+# Nombre del archivo CSV de salida
+salida_csv = 'Rostros.csv'
+
+# Abre el archivo CSV para escritura
+with open(output_csv, 'w', newline='') as csv_file:
+    csv_writer = csv.writer(csv_file)
+    csv_writer.writerow(['emotion', 'pixels'])  # Encabezados del CSV
+
+    # Itera a través de las subcarpetas
+    for c_emocion in os.listdir(carpeta):
+        emocion = c_emocion  # El nombre de la subcarpeta se usa como etiqueta
+
+        # Ruta a la subcarpeta de emociones
+        emotion_folder_path = os.path.join(carpeta, c_emocion)
+
+        # Itera a través de las imágenes en la subcarpeta
+        for n_archivo in os.listdir(cr_emocion):
+            r_imagen = os.path.join(cr_emocion, n_archivo)
+
+            # Abre la imagen y redimensiónala a 48x48 píxeles
+            img = cv2.imread(r_imagen)
+            img = cv2.resize(img, (48, 48))
+
+            # Convierte la imagen en escala de grises
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+            # Convierte la matriz de píxeles en una cadena de valores separados por espacios
+            img_pixeles = ' '.join(map(str, img.flatten()))
+
+            # Escribe la etiqueta de emoción y los píxeles en el CSV
+            csv_writer.writerow([emocion, img_pixeles])
