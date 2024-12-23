@@ -19,3 +19,4 @@ emotion, pixels, usage
 Donde emotion son números enteros del 0 al 6, donde 0 = Enojo, 1 = Asco, 2 = Miedo, 3 = Felicidad, 4 = Tristeza, 5 = Sorpresa, 6 = Neutral,
 pixels son los pixeles, son los valores que devuelve el código y usage toma los valores Training, PrivateTest y PublicTest.
 El 80% de los datos llevan el valor Training, 10% Private Test y 10 % PublicTest, esto se asigna de manera aleatoria, es importante mezclar los datos obtenidos y después asignarles su uso. 
+hola
